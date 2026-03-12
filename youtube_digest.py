@@ -111,9 +111,9 @@ def get_new_videos(channels, lookback_hours, processed_ids):
 def get_transcript(video_id):
     """Fetch the transcript for a YouTube video."""
     try:
-       ytt = YouTubeTranscriptApi()
-transcript_list = ytt.fetch(video_id)
-        return " ".join([t["text"] for t in transcript_list])
+        ytt = YouTubeTranscriptApi()
+        transcript_list = ytt.fetch(video_id)
+        return " ".join([t.get("text", "") for t in transcript_list])
     except (TranscriptsDisabled, NoTranscriptFound):
         return None
     except Exception as e:
@@ -122,7 +122,7 @@ transcript_list = ytt.fetch(video_id)
 
 
 def summarize_video(client, video):
-    """Use Claude to summarize a single video transcript."""
+    """Use Claude to produce a finance-focused summary with sentiment rating."""
     transcript = get_transcript(video["id"])
     if not transcript:
         return None
@@ -132,7 +132,7 @@ def summarize_video(client, video):
     if len(transcript) > max_chars:
         transcript = transcript[:max_chars] + "... [transcript truncated]"
 
-    prompt = f"""You are summarizing a YouTube video for a busy professional.
+    prompt = f"""You are a financial analyst summarizing a YouTube video for an investor's daily digest.
 
 Video: "{video['title']}" by {video['channel']}
 URL: {video['url']}
@@ -140,13 +140,26 @@ URL: {video['url']}
 Transcript:
 {transcript}
 
-Please provide:
-1. **One-line summary** (1 sentence, what this video is about)
-2. **Key Takeaways** (3–5 bullet points, the most important insights)
-3. **Actionable Items** (2–4 specific things the viewer could do based on this video)
-4. **Notable Quotes or Stats** (1–2 standout lines from the video, if any)
+Provide a structured summary in exactly this format — use these exact section headers:
 
-Be concise. Focus on what's most useful and actionable."""
+ONE-LINE SUMMARY
+One sentence describing what this video is about.
+
+KEY TAKEAWAYS
+- 3 to 5 bullet points covering the most important insights and arguments made
+
+ACTIONABLE ITEMS
+- 2 to 4 specific actions an investor could take based on this video
+
+ASSETS & TOPICS MENTIONED
+- List the key assets, sectors, or macro topics discussed (e.g. ETH, Oil, S&P500, Fed rates)
+
+SENTIMENT RATING
+Rate the overall market sentiment expressed in this video on this exact scale:
+Strongly Bearish | Bearish | Neutral | Bullish | Strongly Bullish
+Then write one sentence explaining why.
+
+Be concise and direct. Focus on what is most actionable for an investor."""
 
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
@@ -156,8 +169,23 @@ Be concise. Focus on what's most useful and actionable."""
     return response.content[0].text
 
 
-def find_common_themes(client, summaries):
-    """Use Claude to identify themes across all videos in the digest."""
+def get_sentiment_emoji(summary_text):
+    """Extract sentiment from summary and return emoji + color."""
+    text = summary_text.upper()
+    if "STRONGLY BULLISH" in text:
+        return "🟢🟢", "Strongly Bullish", "#14532d", "#dcfce7"
+    elif "STRONGLY BEARISH" in text:
+        return "🔴🔴", "Strongly Bearish", "#7f1d1d", "#fee2e2"
+    elif "BULLISH" in text:
+        return "🟢", "Bullish", "#166534", "#f0fdf4"
+    elif "BEARISH" in text:
+        return "🔴", "Bearish", "#991b1b", "#fff1f2"
+    else:
+        return "🟡", "Neutral", "#854d0e", "#fefce8"
+
+
+def generate_market_analysis(client, summaries):
+    """Use Claude to produce full trend analysis, consensus and top investor actions."""
     if len(summaries) < 2:
         return None
 
@@ -166,60 +194,175 @@ def find_common_themes(client, summaries):
         for s in summaries
     ])
 
-    prompt = f"""Here are summaries of {len(summaries)} YouTube videos watched today:
+    prompt = f"""You are a senior financial analyst. Below are summaries of {len(summaries)} finance/investing YouTube videos published today.
 
 {summaries_text}
 
-Identify 2–4 common themes, patterns, or recurring ideas across these videos.
-For each theme, name it and explain briefly how it shows up across the videos.
-Be concise — this is a quick overview section in a daily digest email."""
+Produce a market intelligence report in exactly this format — use these exact section headers:
+
+TRENDING THEMES
+Identify 3 to 5 themes or narratives gaining momentum across today's videos. For each, name the theme and explain how it appeared across multiple videos.
+
+OVERALL MARKET CONSENSUS
+Based on all videos combined, what is the overall market sentiment today? 
+State: Strongly Bearish | Bearish | Neutral | Bullish | Strongly Bullish
+Then write 2 to 3 sentences explaining the key factors driving this consensus.
+
+TOP INVESTOR ACTION ITEMS
+List the 5 most important actionable steps an investor should consider today based on everything covered across all videos. Be specific and direct.
+
+Be concise, analytical, and focused on what matters most for an investor."""
 
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
-        max_tokens=600,
+        max_tokens=1200,
         messages=[{"role": "user", "content": prompt}]
     )
     return response.content[0].text
 
 
-def build_email_html(summaries, themes, date_str):
-    """Build a clean HTML email digest."""
+def format_summary_html(summary_text):
+    """Convert plain text summary sections into clean HTML."""
+    if not summary_text:
+        return ""
+
+    html = ""
+    lines = summary_text.strip().split("\n")
+    in_list = False
+
+    section_styles = {
+        "ONE-LINE SUMMARY": ("📌", "#1e3a5f"),
+        "KEY TAKEAWAYS": ("💡", "#1e3a5f"),
+        "ACTIONABLE ITEMS": ("⚡", "#1e3a5f"),
+        "ASSETS & TOPICS MENTIONED": ("📊", "#1e3a5f"),
+        "SENTIMENT RATING": ("🎯", "#1e3a5f"),
+        "TRENDING THEMES": ("📈", "#1e3a5f"),
+        "OVERALL MARKET CONSENSUS": ("🌐", "#1e3a5f"),
+        "TOP INVESTOR ACTION ITEMS": ("✅", "#1e3a5f"),
+    }
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            if in_list:
+                html += "</ul>"
+                in_list = False
+            continue
+
+        matched_section = None
+        for section, (emoji, color) in section_styles.items():
+            if stripped.upper().startswith(section):
+                matched_section = (section, emoji, color)
+                break
+
+        if matched_section:
+            if in_list:
+                html += "</ul>"
+                in_list = False
+            _, emoji, color = matched_section
+            html += f'<p style="margin:16px 0 6px 0; font-weight:bold; font-size:13px; color:{color}; text-transform:uppercase; letter-spacing:0.5px;">{emoji} {stripped}</p>'
+        elif stripped.startswith("- ") or stripped.startswith("• "):
+            if not in_list:
+                html += '<ul style="margin:4px 0 4px 20px; padding:0;">'
+                in_list = True
+            html += f'<li style="margin:4px 0; font-size:14px; color:#333; line-height:1.6;">{stripped[2:]}</li>'
+        else:
+            if in_list:
+                html += "</ul>"
+                in_list = False
+            html += f'<p style="margin:4px 0; font-size:14px; color:#333; line-height:1.6;">{stripped}</p>'
+
+    if in_list:
+        html += "</ul>"
+
+    return html
+
+
+def build_email_html(summaries, market_analysis, date_str):
+    """Build the full HTML email digest."""
+
+    # Build sentiment scoreboard
+    scoreboard_html = ""
+    for s in summaries:
+        emoji, label, text_color, bg_color = get_sentiment_emoji(s["summary"])
+        scoreboard_html += f"""
+        <tr>
+            <td style="padding:8px 12px; font-size:13px; color:#333; border-bottom:1px solid #eee;">
+                <a href="{s['url']}" style="color:#1a56db; text-decoration:none;">{s['title'][:65]}{'...' if len(s['title']) > 65 else ''}</a>
+                <span style="color:#888; font-size:12px;"> — {s['channel']}</span>
+            </td>
+            <td style="padding:8px 12px; text-align:center; border-bottom:1px solid #eee;">
+                <span style="background:{bg_color}; color:{text_color}; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:bold; white-space:nowrap;">
+                    {emoji} {label}
+                </span>
+            </td>
+        </tr>"""
+
+    # Build individual video summaries
     videos_html = ""
     for s in summaries:
+        emoji, label, text_color, bg_color = get_sentiment_emoji(s["summary"])
+        formatted = format_summary_html(s["summary"])
         videos_html += f"""
-        <div style="margin-bottom:32px; padding:20px; background:#f9f9f9; border-left:4px solid #e00; border-radius:4px;">
-            <h3 style="margin:0 0 4px 0; font-size:16px;">
-                <a href="{s['url']}" style="color:#c00; text-decoration:none;">{s['title']}</a>
-            </h3>
-            <p style="margin:0 0 12px 0; color:#888; font-size:13px;">{s['channel']} · {s['published']}</p>
-            <div style="font-size:14px; line-height:1.7; color:#333;">
-                {s['summary'].replace(chr(10), '<br>')}
+        <div style="margin-bottom:28px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
+            <div style="background:#1e3a5f; padding:16px 20px;">
+                <h3 style="margin:0 0 4px 0; font-size:15px; color:#ffffff;">
+                    <a href="{s['url']}" style="color:#ffffff; text-decoration:none;">{s['title']}</a>
+                </h3>
+                <p style="margin:0; color:#93c5fd; font-size:12px;">{s['channel']} · {s['published']}</p>
+            </div>
+            <div style="padding:16px 20px; background:#ffffff;">
+                {formatted}
             </div>
         </div>"""
 
-    themes_html = ""
-    if themes:
-        themes_html = f"""
-        <div style="margin-bottom:32px; padding:20px; background:#fff8e1; border-left:4px solid #f5a623; border-radius:4px;">
-            <h2 style="margin:0 0 12px 0; font-size:18px; color:#333;">🔗 Common Themes Today</h2>
-            <div style="font-size:14px; line-height:1.7; color:#333;">
-                {themes.replace(chr(10), '<br>')}
+    # Build market analysis section
+    analysis_html = ""
+    if market_analysis:
+        formatted_analysis = format_summary_html(market_analysis)
+        analysis_html = f"""
+        <div style="margin-bottom:32px; border:2px solid #1e3a5f; border-radius:8px; overflow:hidden;">
+            <div style="background:#1e3a5f; padding:16px 20px;">
+                <h2 style="margin:0; font-size:17px; color:#ffffff;">📊 Market Intelligence Report</h2>
+                <p style="margin:4px 0 0 0; color:#93c5fd; font-size:12px;">Cross-video trend analysis · {date_str}</p>
+            </div>
+            <div style="padding:20px; background:#f8faff;">
+                {formatted_analysis}
             </div>
         </div>"""
 
     return f"""
-    <html><body style="font-family:Arial,sans-serif; max-width:680px; margin:0 auto; padding:24px; color:#333;">
-        <h1 style="font-size:22px; border-bottom:2px solid #e00; padding-bottom:10px;">
-            📺 Your YouTube Digest — {date_str}
-        </h1>
-        <p style="color:#666; font-size:14px;">{len(summaries)} new video(s) summarized from your subscriptions.</p>
-        {themes_html}
-        <h2 style="font-size:18px; margin-top:28px;">📝 Video Summaries</h2>
+    <html>
+    <body style="font-family:Arial,sans-serif; max-width:700px; margin:0 auto; padding:24px; background:#f3f4f6; color:#333;">
+
+        <!-- Header -->
+        <div style="background:#1e3a5f; border-radius:10px 10px 0 0; padding:28px 28px 20px 28px; margin-bottom:0;">
+            <h1 style="margin:0 0 4px 0; font-size:22px; color:#ffffff;">📺 Finance & Investing Digest</h1>
+            <p style="margin:0; color:#93c5fd; font-size:14px;">{date_str} · {len(summaries)} video{'s' if len(summaries) != 1 else ''} summarized</p>
+        </div>
+
+        <!-- Sentiment Scoreboard -->
+        <div style="background:#ffffff; margin-bottom:24px; border-radius:0 0 10px 10px; padding:20px 24px; border:1px solid #e5e7eb; border-top:none;">
+            <h2 style="margin:0 0 14px 0; font-size:15px; color:#1e3a5f; text-transform:uppercase; letter-spacing:0.5px;">🎯 Sentiment Scoreboard</h2>
+            <table style="width:100%; border-collapse:collapse;">
+                {scoreboard_html}
+            </table>
+        </div>
+
+        <!-- Market Intelligence Report -->
+        {analysis_html}
+
+        <!-- Video Summaries -->
+        <h2 style="font-size:16px; color:#1e3a5f; margin:0 0 16px 0; text-transform:uppercase; letter-spacing:0.5px;">📝 Video Summaries</h2>
         {videos_html}
-        <p style="color:#aaa; font-size:12px; margin-top:40px;">
-            Generated automatically by your YouTube Digest script.
+
+        <!-- Footer -->
+        <p style="color:#aaa; font-size:11px; text-align:center; margin-top:32px; padding-top:16px; border-top:1px solid #e5e7eb;">
+            Generated automatically by your YouTube Digest · Powered by Claude
         </p>
-    </body></html>"""
+
+    </body>
+    </html>"""
 
 
 def send_email(sender, password, recipient, subject, html_body):
@@ -268,19 +411,19 @@ def main():
         print("⚠️  No transcripts were available for any new videos.")
         return
 
-    themes = None
+    market_analysis = None
     if len(summaries) >= 2:
-        print("\n🔗 Finding common themes across videos...")
-        themes = find_common_themes(client, summaries)
+        print("\n📊 Generating market intelligence report...")
+        market_analysis = generate_market_analysis(client, summaries)
 
     date_str = datetime.now().strftime("%B %d, %Y")
-    subject = f"📺 YouTube Digest — {date_str} ({len(summaries)} new videos)"
-    html_body = build_email_html(summaries, themes, date_str)
+    subject = f"📺 Finance Digest — {date_str} ({len(summaries)} new videos)"
+    html_body = build_email_html(summaries, market_analysis, date_str)
 
     print(f"\n📧 Sending digest to {EMAIL_RECIPIENT}...")
     send_email(EMAIL_SENDER, EMAIL_PASSWORD, EMAIL_RECIPIENT, subject, html_body)
 
-    state["processed"] = list(processed_ids)[-500:]  # Keep last 500 IDs max
+    state["processed"] = list(processed_ids)[-500:]
     save_state(state)
 
     print(f"✅ Done! Digest sent with {len(summaries)} video(s).")
