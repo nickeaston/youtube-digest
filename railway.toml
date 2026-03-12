@@ -1,2 +1,2 @@
 [deploy]
-startCommand = "python youtube_digest.py"
+startCommand = "python test_email.py"
