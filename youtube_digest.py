@@ -19,11 +19,11 @@ from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFoun
 # ─────────────────────────────────────────────
 # CONFIGURATION — edit this section
 # ─────────────────────────────────────────────
-ANTHROPIC_API_KEY = "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"
+ANTHROPIC_API_KEY = os.environ.get "ANTHROPIC_API_KEY"
 
-EMAIL_SENDER    = "nickeaston25@gmail.com"
-EMAIL_PASSWORD  = "phkt spdx heqk xzbj"   # Use a Gmail App Password, not your real password
-EMAIL_RECIPIENT = "nickeaston25@gmail.com"
+EMAIL_SENDER    = os.environ.get "GMAIL_SENDER"
+EMAIL_PASSWORD  = os.environ.get "GMAIL_PASSWORD"   # Use a Gmail App Password, not your real password
+EMAIL_RECIPIENT = os.environ.get "EMAIL_RECIPIENT"
 SMTP_SERVER     = "smtp.gmail.com"
 SMTP_PORT       = 587
 
