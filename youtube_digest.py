@@ -19,11 +19,11 @@ from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFoun
 # ─────────────────────────────────────────────
 # CONFIGURATION — edit this section
 # ─────────────────────────────────────────────
-ANTHROPIC_API_KEY = "YOUR_ANTHROPIC_API_KEY"
+ANTHROPIC_API_KEY = "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"
 
-EMAIL_SENDER    = "your_gmail@gmail.com"
-EMAIL_PASSWORD  = "your_gmail_app_password"   # Use a Gmail App Password, not your real password
-EMAIL_RECIPIENT = "your_email@example.com"
+EMAIL_SENDER    = "nickeaston25@gmail.com"
+EMAIL_PASSWORD  = "phkt spdx heqk xzbj"   # Use a Gmail App Password, not your real password
+EMAIL_RECIPIENT = "nickeaston25@gmail.com"
 SMTP_SERVER     = "smtp.gmail.com"
 SMTP_PORT       = 587
 
@@ -37,9 +37,29 @@ STATE_FILE = "processed_videos.json"
 # Format: "Channel Name": "CHANNEL_ID"
 # Find a channel ID: go to the channel page, right-click → View Page Source → search for "channelId"
 CHANNELS = {
-    "Example Channel 1": "UCxxxxxxxxxxxxxxxxxxxxxx",
-    "Example Channel 2": "UCyyyyyyyyyyyyyyyyyyyyyy",
-    # Add more channels here...
+    "Anthony Pompliano": "UCevXpeL8cNyAnww-NqJ4m2w",
+    "Jordi Visser": "UCSLOw8JrFTBb3qF-p4v0v_w",
+    "The Defi Report": "UCGQqZBVIFO8agRSJ1gQCMKw",
+    "Bankless": "UCAl9Ld79qaZxp9JzEOwd3aA",
+    "Altcoin Daily ": "UCbLhGKVY-bJPcawebgtNfbw",
+    "Limitless Podcast": "UCCRxYlYOmLE2l5wxs3ckJtg",
+    "From the Desk of Anthony Pompliano": "UCML9PlpcOxM_H53IM0fa4XA",
+    "The Bitcoin Layer": "UCDo6-SUypaXlTmH6AyrYBZA",
+    "Benjamin Cowen": "UCRvqjQPSeaWn-uEx-w0XOIg",
+    "Productive Dude": "UC3LCokV1C_1HGI4W5rftmvQ",
+    "Real Vision": "UCGXWKlq1Oxr3ddEtmKhAkPg",
+    "ElioTrades": "UCMtJYS0PrtiUwlk6zjGDEMA",
+    "Peter H. Diamandis": "UCvxm0qTrGN_1LMYgUaftWyQ",
+    "Raoul Pal The Journey Man": "UCVFSzL3VuZKP3cN9IXdLOtw",
+    "Coin Bureau": "UCqK_GSMbpiV8spgD3ZGloSw",
+    "Bob Loukas": "UC0zGwzu0zzCImC1BwPuWyXQ",
+    "Daniel LAcalle": "UCLOgSB3-pjMInbDq_kWotsA",
+    "Colin Talks Crypto": "UCnqJ2HjWhm7MbhgFHLUENfQ",
+    "Krown": "UCnwxzpFzZNtLH8NgTeAROFA",
+    "Macro Voices": "UCICRehoZjq3ZtAWgRJX118A",
+    "All-in-podcast": "UCESLZhusAkFfsNsApnjF_Cg",
+    "Forward Guidance ": "UCkrwgzhIBKccuDsi_SvZtnQ",
+    "Bell Curve": "UC9aOLLMQht_1FKRxbQe60NA",
 }
 # ─────────────────────────────────────────────
 
