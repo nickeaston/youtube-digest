@@ -111,9 +111,9 @@ def get_new_videos(channels, lookback_hours, processed_ids):
 def get_transcript(video_id):
     """Fetch the transcript for a YouTube video."""
     try:
-        ytt = YouTubeTranscriptApi()
-        transcript_list = ytt.fetch(video_id)
-        return " ".join([t.get("text", "") for t in transcript_list])
+       ytt = YouTubeTranscriptApi()
+transcript_list = ytt.fetch(video_id)
+return " ".join([t.text for t in transcript_list])
     except (TranscriptsDisabled, NoTranscriptFound):
         return None
     except Exception as e:
